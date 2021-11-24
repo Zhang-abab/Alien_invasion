@@ -1,14 +1,17 @@
 
 import sys
+from time import sleep
 
 import pygame
 from pygame import sprite
+from pygame.display import set_allow_screensaver
 from pygame.image import load
 
 from settings import Settings
 from ship import Ship
 from bullet import Bullet
 from alien import Alien
+from game_stats import GameStats
 
 class AlienInvasion:
     '''管理游戏资源和行为的类'''
@@ -24,6 +27,7 @@ class AlienInvasion:
         self.settings.screen_height = self.screen.get_rect().height
         pygame.display.set_caption("Alien Invasion")
 
+        self.stats = GameStats(self)
         self.ship = Ship(self)
         self.bullets = pygame.sprite.Group()
         self.aliens = pygame.sprite.Group()
@@ -36,9 +40,12 @@ class AlienInvasion:
         '''开始游戏'''
         while True:
             self._check_events()
-            self.ship.update()
-            self._update_aliens()
-            self._update_bullets()
+        
+            if self.stats.game_active:
+                self.ship.update()
+                self._update_aliens()
+                self._update_bullets()
+
             self._update_screen()
 
     def _check_events(self):
@@ -68,6 +75,14 @@ class AlienInvasion:
         elif event.key == pygame.K_LEFT:
             self.ship.moving_left = False
     
+    def _check_aliens_bottom(self):
+        """检查是否有外星人到达了屏幕底端"""
+        screen_rect = self.screen.get_rect()
+        for alien in self.aliens.sprites():
+            if alien.rect.bottom >= screen_rect.bottom:
+                self._ship_hit()
+                break
+
     def _fire_bullet(self):
         """创建一颗子弹，并加入bullets中"""
         if len(self.bullets) < self.settings.bullet_allowed:
@@ -83,9 +98,15 @@ class AlienInvasion:
         for bullet in self.bullets.copy():
             if bullet.rect.bottom <= 0:
                 self.bullets.remove(bullet)
+        self._check_bullet_alien_collisions()
 
+    def _check_bullet_alien_collisions(self):
         collisions = pygame.sprite.groupcollide(self.bullets, self.aliens, True, True)
-    
+        if not self.aliens:
+            #删除现有的子弹并新建一群外星人
+            self.bullets.empty()
+            self._create_fleet()
+        
     def _update_screen(self):
         """更新屏幕上的图像，并切换到新的屏幕"""
         self.screen.fill(self.settings.bg_color)
@@ -94,10 +115,6 @@ class AlienInvasion:
             bullet.draw_bullet()
         self.aliens.draw(self.screen)
         pygame.display.flip()
-
-    def _update_aliens(self):
-        """更新外星人群中所有外星人的位置"""
-        self.aliens.update()
 
     def _create_fleet(self):
         """创建外星人群"""
@@ -143,6 +160,33 @@ class AlienInvasion:
         """检查是否有外星人位于屏幕边缘"""
         self._check_fleet_edges()
         self.aliens.update()
+
+        """响应飞船外星人碰撞"""
+        print(1)
+        if pygame.sprite.spritecollideany(self.ship, self.aliens):
+            print(2)
+            self._ship_hit()
+
+        self._check_aliens_bottom()
+
+    def _ship_hit(self):
+        """响应飞船被外星人撞到"""
+        if self.stats.ships_left > 0:
+            #将ships_left-1
+            self.stats.ships_left -= 1
+
+            #清空余下的外星人和子弹
+            self.aliens.empty()
+            self.bullets.empty()
+
+            #创建一群新的外星人，并将飞机放到屏幕底端中央.
+            self._create_fleet()
+            self.ship.center_ship()
+
+            #暂停0.5
+            sleep(0.5)
+        else:
+            self.stats.game_active = False
 
 if __name__ == '__main__':
     #创建游戏实例并运行游戏
