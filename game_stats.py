@@ -9,7 +9,7 @@ class GameStats:
         self.settings = ai_game.settings
         self.reset_stats()
         #游戏启动标志位
-        self.game_active = True
+        self.game_active = False
 
     def reset_stats(self):
         """初始化在游戏运行期间可能产生变化的值"""
